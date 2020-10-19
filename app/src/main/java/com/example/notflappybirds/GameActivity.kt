@@ -3,86 +3,124 @@ package com.example.notflappybirds
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.constraintlayout.widget.ConstraintLayout
 import kotlin.math.round
 import kotlin.properties.Delegates
 
-class InitialCountDown(gameActivity: GameActivity){
-    val countDownEnded = mutableListOf<() -> Unit>()
+class InitialCountDown(val initialCountDownView: TextView, val gameActivity: GameActivity){
+    val lengthOfCountDown: Int = 4
 
-    var startTiming: Int by Delegates.observable(0) { _, _, _ ->
-        countDownEnded.forEach{it()}
-    }
+    fun updateInitialCountDown(tick: Int): Unit {
+        val countDown = lengthOfCountDown - tick
 
-    val countDownThread: Thread = object : Thread() {
-        var x = 3
-        override fun run() {
-            try {
-                while (!this.isInterrupted && x >= 0) {
-                    gameActivity.runOnUiThread {
-                        if(x == 0){
-                            gameActivity.mInitalCountDown.text = "GO!"
-                        }else{
-                            gameActivity.mInitalCountDown.text = x.toString()
-                        }
-                    }
-                    sleep(1000)
-                    x -= 1
-                }
-            } catch (e: InterruptedException) {
-            }
-
+        if(countDown < 0){
             gameActivity.runOnUiThread {
-                gameActivity.mInitalCountDown.visibility = View.GONE
+                initialCountDownView.visibility = View.GONE
             }
-            startTiming = 1
+        }
+
+        gameActivity.runOnUiThread {
+            if (countDown > 0){
+                initialCountDownView.text = countDown.toString()
+            } else {
+                initialCountDownView.text = "GO!"
+            }
+
         }
     }
 }
 
-class Timer(gameActivity: GameActivity){
-    var mSurvivedTime: Long = 0
+class gameTime(gameActivity: GameActivity){
+    val gameEnded = mutableListOf<() -> Unit>()
 
-    private val timerThread: Thread = object : Thread() {
+    var stopTimer: Int by Delegates.observable(0) { _, _, _ ->
+        gameEnded.forEach{it()}
+    }
+
+    val timeListeners = mutableListOf<(Int) -> Unit>()
+
+    var secondsPassed: Int by Delegates.observable(0) { _, _, newValue ->
+        timeListeners.forEach{it(newValue)}
+    }
+
+    var timeStarted: Long = 0
+
+    private val timeThread: Thread = object : Thread() {
         override fun run() {
-            mSurvivedTime = System.nanoTime()
-            while(true){
-                var minutes = round(((System.nanoTime() - mSurvivedTime) / 1000000000 / 60).toDouble()).toInt()
-                var seconds = round(((System.nanoTime() - mSurvivedTime) / 1000000000 % 60).toDouble()).toInt()
+            timeStarted = System.nanoTime()
+            while(stopTimer == 0){
+                // var minutes = round(((System.nanoTime() - mSurvivedTime) / 1000000000 / 60).toDouble()).toInt()
+                var tick = round(((System.nanoTime() - timeStarted) / 1000000000 % 60).toDouble()).toInt()
 
-                gameActivity.runOnUiThread {
-                    gameActivity.mTimer.text = "${minutes.toString()} : ${seconds.toString()}"
+                if(secondsPassed != tick){
+                    secondsPassed = tick
                 }
+
             }
         }
     }
 
-    fun startTimer (): Unit {
-        timerThread.start()
+    fun startGameTime (): Unit {
+        timeThread.start()
+    }
+}
+
+class Character(val startDelay: Int, val characterImageView: ImageView, val gameActivity: GameActivity){
+
+    fun driftDown(tick: Int): Unit {
+        if(tick > startDelay){
+            gameActivity.runOnUiThread {
+                characterImageView.y = characterImageView.y + 10
+            }
+        }
+    }
+}
+
+class ScoreTimer(val startDelay: Int, val scoreTextBox: TextView, val gameActivity: GameActivity){
+    fun updateScore(tick: Int): Unit {
+        val correctedTick = tick - startDelay
+        if(correctedTick > 0){
+            gameActivity.runOnUiThread{
+                scoreTextBox.text = correctedTick.toString()
+            }
+        }
     }
 }
 
 class GameActivity : AppCompatActivity() {
-    lateinit var mInitalCountDown: TextView
+    lateinit var mInitialCountDown: TextView
     lateinit var mTimer: TextView
+    lateinit var mCharacterImg: ImageView
+    lateinit var mConstraintLayout: ConstraintLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_game)
 
-        mInitalCountDown = findViewById(R.id.initalCountDown)
+        mInitialCountDown = findViewById(R.id.initalCountDown)
         mTimer = findViewById(R.id.playTime)
+        mConstraintLayout = findViewById(R.id.gameConstraintLayout)
+        mCharacterImg = findViewById(R.id.birdImage)
 
-        val scoreTimer = Timer(this)
-        val countDown = InitialCountDown(this)
-
-        countDown.countDownEnded.add {
-            scoreTimer.startTimer()
+        mConstraintLayout.setOnClickListener {
+            // Log.i("PR", "tapped")
         }
 
-        countDown.countDownThread.start()
+        val gameTime = gameTime(this)
+        val countDown = InitialCountDown(mInitialCountDown,this)
+        val character = Character(countDown.lengthOfCountDown, mCharacterImg, this)
+        val scoreTimer = ScoreTimer(countDown.lengthOfCountDown, mTimer, this)
 
+        gameTime.timeListeners.add{secondsPassed ->
+            character.driftDown(secondsPassed)
+            scoreTimer.updateScore(secondsPassed)
+            countDown.updateInitialCountDown(secondsPassed)
+        }
+
+        gameTime.startGameTime()
     }
 
 
