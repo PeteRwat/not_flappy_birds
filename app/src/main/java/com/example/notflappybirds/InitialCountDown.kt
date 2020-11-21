@@ -2,14 +2,20 @@ package com.example.notflappybirds
 
 import android.view.View
 import android.widget.TextView
+import kotlin.properties.Delegates
 
-class InitialCountDown(val initialCountDownView: TextView, val gameActivity: GameActivity){
-    val lengthOfCountDown: Int = 4
+class InitialCountDown(val lengthOfInitialCountDown: Int, val initialCountDownView: TextView, val gameActivity: GameActivity){
+    val endOfInitialCountDownListeners = mutableListOf<(Int) -> Unit>()
+
+    var initialCountDownEnded: Int by Delegates.observable(0) { _, _, newValue ->
+        endOfInitialCountDownListeners.forEach{it(newValue)}
+    }
 
     fun updateInitialCountDown(tick: Int): Unit {
-        val countDown = lengthOfCountDown - tick
+        val countDown = lengthOfInitialCountDown - tick
 
         if(countDown < 0){
+            initialCountDownEnded = lengthOfInitialCountDown
             gameActivity.runOnUiThread {
                 initialCountDownView.visibility = View.GONE
             }

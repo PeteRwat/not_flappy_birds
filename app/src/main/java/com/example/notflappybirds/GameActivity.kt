@@ -1,6 +1,7 @@
 package com.example.notflappybirds
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -11,8 +12,10 @@ class GameActivity : AppCompatActivity() {
     private lateinit var mTimer: TextView
     private lateinit var mCharacterImg: ImageView
     private lateinit var mConstraintLayout: ConstraintLayout
+    private lateinit var mCollisionDetection: CollisionDetection
     lateinit var mDrawView: DrawBars
     private val bars = Bars()
+    private val lengthOfInitialCountDown = 4
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,20 +27,38 @@ class GameActivity : AppCompatActivity() {
         mCharacterImg = findViewById(R.id.birdImage)
         mDrawView = DrawBars(this, bars.toDraw)
 
+        mInitialCountDown.text = lengthOfInitialCountDown.toString()
+
         val gameTime = GameTime()
-        val countDown = InitialCountDown(mInitialCountDown,this)
-        val character = Character(countDown.lengthOfCountDown, mCharacterImg, this)
-        val scoreTimer = ScoreTimer(countDown.lengthOfCountDown, mTimer, this)
+        val countDown = InitialCountDown(lengthOfInitialCountDown, mInitialCountDown,this)
+        val character = Character(mCharacterImg, this)
+
+        val scoreTimer = ScoreTimer(mTimer, this)
+        mCollisionDetection = CollisionDetection(character, bars.toDraw)
 
         mConstraintLayout.setOnClickListener {
             character.jumpUp()
         }
 
-        gameTime.timeListeners.add{secondsPassed ->
-            character.driftDown(secondsPassed)
+        mCollisionDetection.collisionListeners.add{
+            gameTime.stopGameTimer()
+        }
+
+        gameTime.timeListenersSeconds.add{secondsPassed ->
             scoreTimer.updateScore(secondsPassed)
             countDown.updateInitialCountDown(secondsPassed)
+        }
+
+        gameTime.timeListenersSixtiethSecond.add{
+            character.driftDown()
             bars.updateBars(this, mDrawView, mConstraintLayout)
+            mCollisionDetection.checkBars()
+        }
+
+        countDown.endOfInitialCountDownListeners.add{lengthOfCountDown ->
+            character.initialCountDownEned()
+            scoreTimer.initialCountDownEnded(lengthOfCountDown)
+            bars.initialCountDownEned()
         }
 
 

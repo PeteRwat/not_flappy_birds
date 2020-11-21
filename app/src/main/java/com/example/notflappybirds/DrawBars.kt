@@ -12,12 +12,10 @@ class DrawBars(context: Context, barsToDraw: MutableList<BarCoord>) : View(conte
     var barsToDraw = barsToDraw
 
     override fun onDraw(canvas: Canvas) {
-        Log.i("PR", "drawing")
         barsToDraw.forEach {
             paint.color = Color.BLACK
             canvas.drawRect(it.topBarLeft, it.topBarTop, it.topBarRight , it.topBarBottom, paint)
             canvas.drawRect(it.bottomBarLeft, it.bottomBarTop, it.bottomBarRight, it.bottomBarBottom, paint)
         }
-
     }
 }
